@@ -1,0 +1,357 @@
+
+package com.example.construiestecasa
+
+import android.os.Bundle
+import androidx.activity.ComponentActivity
+import androidx.activity.compose.setContent
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.layout.*
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material3.*
+import androidx.compose.runtime.*
+import androidx.compose.runtime.saveable.rememberSaveable
+import androidx.compose.ui.Alignment
+import androidx.compose.ui.Modifier
+import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.graphics.Path
+import androidx.compose.ui.graphics.Shape
+import androidx.compose.ui.unit.Density
+import androidx.compose.ui.unit.LayoutDirection
+import androidx.compose.ui.unit.dp
+import androidx.compose.ui.geometry.Size
+import androidx.compose.ui.graphics.Outline
+import androidx.compose.ui.unit.Dp
+
+class MainActivity : ComponentActivity() {
+    override fun onCreate(savedInstanceState: Bundle?) {
+        super.onCreate(savedInstanceState)
+        setContent {
+            MaterialTheme {
+                HouseApp()
+            }
+        }
+    }
+}
+
+// Culorile aplicatiei
+val BackgroundColor = Color(0xFFF4F3EF)
+val GroundColor = Color(0xFFBFC9C2)
+val WallColor = Color(0xFF1B2420)
+val RoofColor = Color(0xFF3B7A4F)
+val WindowColor = Color(0xFFB3E5C5)
+
+// Partile casei
+enum class HousePart {
+    FOUNDATION,
+    WALLS,
+    ROOF,
+    LEFT_WINDOW,
+    RIGHT_WINDOW,
+    DOOR
+}
+
+// Modelul unei etape
+data class BuildStep(
+    val id: Int,
+    val title: String,
+    val part: HousePart,
+    val isDone: Boolean = false
+)
+
+// Lista initiala de etape
+object BuildSteps {
+    val items = listOf(
+        BuildStep(1, "Turnarea fundatiei", HousePart.FOUNDATION),
+        BuildStep(2, "Ridicarea peretilor", HousePart.WALLS),
+        BuildStep(3, "Montarea acoperisului", HousePart.ROOF),
+        BuildStep(4, "Instalarea ferestrei din stanga", HousePart.LEFT_WINDOW),
+        BuildStep(5, "Instalarea ferestrei din dreapta", HousePart.RIGHT_WINDOW),
+        BuildStep(6, "Montarea usii", HousePart.DOOR)
+    )
+}
+
+// Forma triunghiulara pentru acoperis
+class TriangleShape : Shape {
+    override fun createOutline(
+        size: Size,
+        layoutDirection: LayoutDirection,
+        density: Density
+    ): Outline {
+        val path = Path().apply {
+            moveTo(size.width / 2f, 0f)
+            lineTo(size.width, size.height)
+            lineTo(0f, size.height)
+            close()
+        }
+        return Outline.Generic(path)
+    }
+}
+
+@OptIn(ExperimentalMaterial3Api::class)
+@Composable
+fun HouseApp() {
+
+    // Pastram numarul etapelor si dupa rotirea ecranului
+    var doneCount by rememberSaveable {
+        mutableIntStateOf(0)
+    }
+
+    var showSheet by remember {
+        mutableStateOf(false)
+    }
+
+    // Construim lista in functie de starea curenta
+    val steps = BuildSteps.items.mapIndexed { index, step ->
+        step.copy(isDone = index < doneCount)
+    }
+
+    Scaffold(
+        containerColor = BackgroundColor,
+
+        topBar = {
+            TopAppBar(
+                title = {
+                    Text("Construieste casa")
+                },
+                colors = TopAppBarDefaults.topAppBarColors(
+                    containerColor = BackgroundColor
+                )
+            )
+        },
+
+        floatingActionButton = {
+            FloatingActionButton(
+                onClick = { showSheet = true },
+                containerColor = RoofColor,
+                contentColor = Color.White
+            ) {
+                Text("+")
+            }
+        }
+
+    ) { padding ->
+
+        Column(
+            modifier = Modifier
+                .fillMaxSize()
+                .padding(padding)
+                .padding(16.dp),
+            horizontalAlignment = Alignment.CenterHorizontally,
+            verticalArrangement = Arrangement.spacedBy(18.dp)
+        ) {
+
+            Text(
+                text = "Progres: $doneCount / 6 etape",
+                style = MaterialTheme.typography.titleMedium
+            )
+
+            LinearProgressIndicator(
+                progress = { doneCount / 6f },
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .height(8.dp),
+                color = RoofColor,
+                trackColor = GroundColor
+            )
+
+            Spacer(modifier = Modifier.height(15.dp))
+
+            // Desenarea casei
+            HouseDrawing(doneCount)
+
+            if (doneCount == 6) {
+                Text(
+                    text = "Casa este gata!",
+                    style = MaterialTheme.typography.headlineMedium,
+                    color = RoofColor
+                )
+            }
+
+            if (doneCount > 0) {
+                OutlinedButton(
+                    onClick = { doneCount = 0 }
+                ) {
+                    Text("Reseteaza constructia")
+                }
+            }
+        }
+    }
+
+    // Bottom Sheet
+    if (showSheet) {
+        ModalBottomSheet(
+            onDismissRequest = { showSheet = false },
+            containerColor = BackgroundColor
+        ) {
+
+            Column(
+                modifier = Modifier
+                    .fillMaxWidth()
+                    .padding(horizontal = 20.dp)
+                    .padding(bottom = 30.dp)
+            ) {
+
+                Text(
+                    text = "Etapele constructiei",
+                    style = MaterialTheme.typography.titleLarge
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                Text(
+                    text = "$doneCount / 6 etape finalizate",
+                    color = RoofColor
+                )
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                steps.forEachIndexed { index, step ->
+
+                    val enabled = if (step.isDone) {
+                        index == doneCount - 1
+                    } else {
+                        index == doneCount
+                    }
+
+                    Row(
+                        modifier = Modifier
+                            .fillMaxWidth()
+                            .padding(vertical = 8.dp),
+                        verticalAlignment = Alignment.CenterVertically
+                    ) {
+
+                        Checkbox(
+                            checked = step.isDone,
+                            enabled = enabled,
+                            onCheckedChange = { checked ->
+
+                                if (checked && index == doneCount) {
+                                    doneCount++
+                                } else if (!checked &&
+                                    index == doneCount - 1
+                                ) {
+                                    doneCount--
+                                }
+                            },
+                            colors = CheckboxDefaults.colors(
+                                checkedColor = RoofColor
+                            )
+                        )
+
+                        Text(
+                            text = "${step.id}. ${step.title}",
+                            modifier = Modifier.padding(start = 8.dp),
+                            color = if (enabled) {
+                                Color(0xFF1B2420)
+                            } else {
+                                Color.Gray
+                            }
+                        )
+                    }
+                }
+
+                Spacer(modifier = Modifier.height(12.dp))
+
+                if (doneCount == 6) {
+                    Text(
+                        text = "Casa este gata!",
+                        color = RoofColor,
+                        style = MaterialTheme.typography.titleMedium
+                    )
+                }
+
+                OutlinedButton(
+                    onClick = { doneCount = 0 },
+                    modifier = Modifier.fillMaxWidth()
+                ) {
+                    Text("Reseteaza constructia")
+                }
+            }
+        }
+    }
+}
+
+// Desenarea casei
+@Composable
+fun HouseDrawing(doneCount: Int) {
+
+    Box(
+        modifier = Modifier
+            .size(width = 320.dp, height = 300.dp)
+    ) {
+
+        // 1. Fundatia
+        if (doneCount >= 1) {
+            Box(
+                modifier = Modifier
+                    .width(280.dp)
+                    .height(4.dp)
+                    .align(Alignment.BottomCenter)
+                    .offset(y = (-20).dp)
+                    .background(GroundColor)
+            )
+        }
+
+        // 2. Peretii
+        if (doneCount >= 2) {
+            Box(
+                modifier = Modifier
+                    .width(180.dp)
+                    .height(130.dp)
+                    .align(Alignment.BottomCenter)
+                    .offset(y = (-45).dp)
+                    .background(Color.White)
+                    .border(2.dp, WallColor)
+            )
+        }
+
+        // 3. Acoperisul
+        if (doneCount >= 3) {
+            Box(
+                modifier = Modifier
+                    .width(220.dp)
+                    .height(105.dp)
+                    .align(Alignment.TopCenter)
+                    .offset(y = 15.dp)
+                    .background(RoofColor, TriangleShape())
+            )
+        }
+
+        // 4. Fereastra stanga
+        if (doneCount >= 4) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .align(Alignment.Center)
+                    .offset(x = (-48).dp, y = 35.dp)
+                    .background(WindowColor)
+                    .border(2.dp, WallColor)
+            )
+        }
+
+        // 5. Fereastra dreapta
+        if (doneCount >= 5) {
+            Box(
+                modifier = Modifier
+                    .size(34.dp)
+                    .align(Alignment.Center)
+                    .offset(x = 48.dp, y = 35.dp)
+                    .background(WindowColor)
+                    .border(2.dp, WallColor)
+            )
+        }
+
+        // 6. Usa
+        if (doneCount >= 6) {
+            Box(
+                modifier = Modifier
+                    .width(42.dp)
+                    .height(65.dp)
+                    .align(Alignment.BottomCenter)
+                    .offset(y = (-45).dp)
+                    .background(WallColor)
+            )
+        }
+    }
+}
